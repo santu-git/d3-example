@@ -1,0 +1,6 @@
+product,production_no,node,time
+P1,PN1,node11,10:00:05
+P1,PN1,node12,10:30:05
+P1,PN1,node22,10:35:40
+P2,PN2,node21,10:00
+P2,PN2,node22,10:00
