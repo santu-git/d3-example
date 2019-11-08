@@ -5,21 +5,36 @@
   <script src="https://d3js.org/d3.v5.min.js"></script>
   <script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
   <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+  <style>
+    .info-box {
+      box-shadow: 5px 10px #888888;
+      ;
+    }
+  </style>
 </head>
 
 <body>
 
 </body>
 <script>
-  var diameter = 960;
-
+  var canvasSize = 960;
+  var randPointGenY = d3.scaleLinear()
+    .domain([0.0, 0.5, 1.0])
+    .range([-15, 8, 15]);
+  var randPointGenX = d3.scaleLinear()
+    .domain([0.0, 0.5, 1.0])
+    .range([-30, 15, 30]);
   var svg = d3.select("body").append("svg")
-    .attr("width", diameter)
-    .attr("height", diameter);
+    .attr("width", canvasSize)
+    .attr("height", canvasSize)
+    .call(d3.zoom().on("zoom", function () {
+      svg.attr("transform", d3.event.transform)
+    }))
   var nodeCanvas = svg.append('g').attr('class', 'node-canvas');
   var pathCanvas = svg.append('g').attr('class', 'path-canvas');
   var longPathCanvas = svg.append('g').attr('class', 'long-canvas');
   var legendCanvas = svg.append('g').attr('class', 'legend-canvas');
+  var infoCanvas = svg.append('g').attr('class', 'info-canvas');
 
   d3.json('node.json').then(function (rects) {
     nodeCanvas.selectAll('rect').data(rects).enter().append('rect').each(function (d, i) {
@@ -39,6 +54,7 @@
   pathDensityGroup = {};
   pathLengthGroup = [];
   pathDensityColor = d3.piecewise(d3.interpolateHsl, ["green", "orange", "red", "black"])
+  multiColor = d3.interpolateRainbow;
   schemeOranges = d3.interpolateOranges;
   schemeBlue = d3.interpolateBlues;
   d3.csv("data.csv").then(function (productMoves) {
@@ -51,58 +67,68 @@
       let product = productGroup[idx];
       var points = [];
       for (node of product.values) {
-        let bBox = d3.select('#' + node.node).node().getBBox();
-        points.push({
-          x: (bBox.x + bBox.width / 2),
-          y: (bBox.y + bBox.height / 2)
-        })
-      }
-      pathLengthGroup.push({
-        path: lineFunction(points),
-        length: points.length,
-        product: product
-      });
-
-      pairwise(points, function (current, next) {
-        lineFunction([current, next]);
-        //pathDensityGroup[lineFunction([current, next])]
-        if (pathDensityGroup[lineFunction([current, next])]) {
-          pathDensityGroup[lineFunction([current, next])] += 1;
-        } else {
-          pathDensityGroup[lineFunction([current, next])] = 1;
+        try {
+          let bBox = d3.select('#' + node.node).node().getBBox();
+          points.push({
+            x: (bBox.x + bBox.width / 2),
+            y: (bBox.y + bBox.height / 2)
+          })
+        } catch (e) {
+          console.log(e);
         }
-      }, 1)
 
+      }
+      intIndex = parseInt(idx);
+      let fractor = ((parseInt(idx) + 1) / (productGroup.length + 1));
+      if (points.length == 2) {
+        let randomPoint = {}
+        if (points[0].y == points[1].y) {
+          randomPoint['x'] = (points[0].x + points[1].x) / 2;
+          randomPoint['y'] = (points[0].y + parseFloat(randPointGenY(fractor).toFixed(2)));
+        } else {
+          randomPoint['y'] = (points[0].y + points[1].y) / 2;
+          randomPoint['x'] = (points[0].x + parseFloat(randPointGenX(fractor).toFixed(2)));
+        }
+        points.splice(1, 0, randomPoint);
+      }
+      var curveLine = d3.line().x(function (d) {
+        return d.x
+      }).y(function (d) {
+        return d.y
+      }).curve(d3.curveCardinal.tension(fractor.toFixed(2)));
+      let path = pathCanvas.append('path').attrs({
+          d: curveLine(points),
+          stroke: multiColor(fractor),
+          'stroke-width': 0.5,
+          "fill": "none",
+          class: 'move-path',
+        })
+        .on('mouseover', function () {
+          renderInfoCanvas({
+            product: product.values[0].product,
+            production_no: product.values[0].production_no
+          }, {
+            x: d3.mouse(this)[0],
+            y: d3.mouse(this)[1]
+          })
+          d3.select(this).attr('stroke-width', 2)
+        }).on('mouseout', function () {
+          removeInfoCanvas();
+          d3.select(this).attr('stroke-width', 0.5)
+        });
+      //path.data(product.values[0]);
     }
-    totalPath = Object.values(pathDensityGroup).reduce((a, b) => a + b, 0);
 
-    Object.entries(pathDensityGroup).forEach(function (path) {
-      pathCanvas.append('path').attr("d", path[0]).attrs({
-        "stroke": pathDensityColor((path[1] / totalPath).toFixed(1)),
-        //"stroke": schemeOranges((path[1] / totalPath).toFixed(1)),
-        "stroke-width": 1,
-        "fill": "none",
-        "class": 'move-path'
-      });
-    })
 
-    //console.log(pathLengthGroup);
-    var sortedPath = pathLengthGroup.sort(function (x, y) {
-      return d3.ascending(x.value, y.value);
-    });
-    // var totalLength = sortedPath.reduce(function (a, b) {
-    //   return a + b.length
-    // }, 0);
-    var maxPath = sortedPath.reduce(function (a, b) {
-      return a.length > b.length ? a : b
-    });
-    var legendsItemList = legendCanvas.selectAll('g.legend-item').data(sortedPath).enter();
+
+
+    /*var legendsItemList = legendCanvas.selectAll('g.legend-item').data(sortedPath).enter();
     var legendsItem = legendsItemList.append('g').attrs({
       class: 'legend-item',
       cursor: 'pointer'
     });
     legendsItem.append('circle').attrs({
-      cx: diameter - 100,
+      cx: canvasSize - 100,
       cy: function (d, i) {
         return 100 + i * 25
       },
@@ -112,7 +138,7 @@
       }
     });
     legendsItem.append('text').attrs({
-      x: diameter - 80,
+      x: canvasSize - 80,
       y: function (d, i) {
         return 100 + i * 25
       },
@@ -134,8 +160,34 @@
     legendsItem.on("mouseout", function () {
       pathCanvas.attr('display', 'block');
       longPathCanvas.selectAll('path').remove();
-    });
+    });*/
   })
+
+  function renderInfoCanvas(data, position) {
+    infoCanvas.append('rect').attrs({
+      class: 'info-box',
+      x: position.x + 10,
+      y: position.y + 10,
+      width: 140,
+      height: 60,
+      fill: 'white',
+      'stroke-width': 1,
+      'stroke': 'black',
+    })
+    infoCanvas.append("text").text("Product name: " + data.product).attrs({
+      x: position.x + 20,
+      y: position.y + 30
+    })
+    infoCanvas.append("text").text("Product Line: " + data.production_no).attrs({
+      x: position.x + 20,
+      y: position.y + 50
+    })
+  }
+
+  function removeInfoCanvas() {
+    infoCanvas.selectAll('text').remove();
+    infoCanvas.selectAll('rect').remove();
+  }
 
   function pairwise(arr, func, skips) {
 
