@@ -49,6 +49,7 @@
         fill: 'none'
       });
     });
+    renderPah();
   })
 
   pathDensityGroup = {};
@@ -57,111 +58,90 @@
   multiColor = d3.interpolateRainbow;
   schemeOranges = d3.interpolateOranges;
   schemeBlue = d3.interpolateBlues;
-  d3.csv("data.csv").then(function (productMoves) {
-    let productGroup = d3.nest()
-      .key(function (d) {
-        return d.product;
-      })
-      .entries(productMoves);
-    for (idx in productGroup) {
-      let product = productGroup[idx];
-      var points = [];
-      for (node of product.values) {
-        try {
-          let bBox = d3.select('#' + node.node).node().getBBox();
-          points.push({
-            x: (bBox.x + bBox.width / 2),
-            y: (bBox.y + bBox.height / 2)
-          })
-        } catch (e) {
-          console.log(e);
-        }
 
-      }
-      intIndex = parseInt(idx);
-      let fractor = ((parseInt(idx) + 1) / (productGroup.length + 1));
-      if (points.length == 2) {
-        let randomPoint = {}
-        if (points[0].y == points[1].y) {
-          randomPoint['x'] = (points[0].x + points[1].x) / 2;
-          randomPoint['y'] = (points[0].y + parseFloat(randPointGenY(fractor).toFixed(2)));
-        } else {
-          randomPoint['y'] = (points[0].y + points[1].y) / 2;
-          randomPoint['x'] = (points[0].x + parseFloat(randPointGenX(fractor).toFixed(2)));
-        }
-        points.splice(1, 0, randomPoint);
-      }
-      var curveLine = d3.line().x(function (d) {
-        return d.x
-      }).y(function (d) {
-        return d.y
-      }).curve(d3.curveCardinal.tension(fractor.toFixed(2)));
-      let path = pathCanvas.append('path').attrs({
-          d: curveLine(points),
-          stroke: multiColor(fractor),
-          'stroke-width': 0.5,
-          "fill": "none",
-          class: 'move-path',
+  function renderPah() {
+    d3.csv("data.csv").then(function (productMoves) {
+      let productGroup = d3.nest()
+        .key(function (d) {
+          return d.product;
         })
-        .on('mouseover', function () {
-          renderInfoCanvas({
-            product: product.values[0].product,
-            production_no: product.values[0].production_no
-          }, {
-            x: d3.mouse(this)[0],
-            y: d3.mouse(this)[1]
+        .entries(productMoves);
+      for (idx in productGroup) {
+        let product = productGroup[idx];
+        var points = [];
+        for (node of product.values) {
+          try {
+            let bBox = d3.select('#' + node.node).node().getBBox();
+            points.push({
+              x: (bBox.x + bBox.width / 2),
+              y: (bBox.y + bBox.height / 2)
+            })
+          } catch (e) {
+            console.log(e);
+          }
+
+        }
+        intIndex = parseInt(idx);
+        let factor = ((parseInt(idx) + 1) / (productGroup.length + 1));
+        if (points.length == 2) {
+          let randomPoint = [];
+          if (points[0].y == points[1].y) {
+            randomPoint[0] = {}
+            randomPoint[0]['x'] = (points[0].x + points[1].x) / 2;
+            randomPoint[0]['y'] = (points[0].y + parseFloat(randPointGenY(factor).toFixed(2)));
+          } else if (points[0].x == points[1].x) {
+            randomPoint[0] = {}
+            randomPoint[0]['y'] = (points[0].y + points[1].y) / 2;
+            randomPoint[0]['x'] = (points[0].x + parseFloat(randPointGenX(factor).toFixed(2)));
+          } else {
+            let quartX = Math.abs((points[0].x - points[1].x) / 4);
+            let quartY = Math.abs((points[0].y - points[1].y) / 3);
+            randomPoint[0] = {}
+            randomPoint[1] = {}
+            randomPoint[0]['x'] = points[0].x
+            randomPoint[1]['x'] = points[1].x
+            if (points[0].y > points[1].y) {
+              randomPoint[0]['y'] = points[0].y - quartY - parseFloat(randPointGenY(factor).toFixed(2));
+              randomPoint[1]['y'] = points[1].y + quartY + parseFloat(randPointGenY(factor).toFixed(2));
+            } else {
+              randomPoint[0]['y'] = points[0].y + quartY + parseFloat(randPointGenY(factor).toFixed(2));
+              randomPoint[1]['y'] = points[1].y - quartY - parseFloat(randPointGenY(factor).toFixed(2));
+            }
+
+
+          }
+          points.splice(1, 0, ...randomPoint);
+          console.log(points);
+        }
+        var curveLine = d3.line().x(function (d) {
+          return d.x
+        }).y(function (d) {
+          return d.y
+        }).curve(d3.curveCardinal.tension(factor.toFixed(2)));
+        let path = pathCanvas.append('path').attrs({
+            d: curveLine(points),
+            stroke: multiColor(factor),
+            'stroke-width': 0.5,
+            "fill": "none",
+            class: 'move-path',
           })
-          d3.select(this).attr('stroke-width', 2)
-        }).on('mouseout', function () {
-          removeInfoCanvas();
-          d3.select(this).attr('stroke-width', 0.5)
-        });
-      //path.data(product.values[0]);
-    }
-
-
-
-
-    /*var legendsItemList = legendCanvas.selectAll('g.legend-item').data(sortedPath).enter();
-    var legendsItem = legendsItemList.append('g').attrs({
-      class: 'legend-item',
-      cursor: 'pointer'
-    });
-    legendsItem.append('circle').attrs({
-      cx: canvasSize - 100,
-      cy: function (d, i) {
-        return 100 + i * 25
-      },
-      r: 7,
-      fill: function (d, i) {
-        return schemeBlue((d.length / maxPath.length).toFixed(1))
+          .on('mouseover', function () {
+            renderInfoCanvas({
+              product: product.values[0].product,
+              production_no: product.values[0].production_no
+            }, {
+              x: d3.mouse(this)[0],
+              y: d3.mouse(this)[1]
+            })
+            d3.select(this).attr('stroke-width', 2)
+          }).on('mouseout', function () {
+            removeInfoCanvas();
+            d3.select(this).attr('stroke-width', 0.5)
+          });
+        //path.data(product.values[0]);
       }
-    });
-    legendsItem.append('text').attrs({
-      x: canvasSize - 80,
-      y: function (d, i) {
-        return 100 + i * 25
-      },
-      "text-anchor": "left",
-      "alignment-baseline": "middle"
-
-    }).text(function (d, i) {
-      return d.product.key
-    });
-    legendsItem.on("mouseover", function () {
-      pathCanvas.attr('display', 'none');
-      let currentData = d3.select(this).datum();
-      longPathCanvas.append('path').attrs({
-        d: currentData.path,
-        stroke: schemeBlue((currentData.length / maxPath.length).toFixed(1)),
-        fill: 'none'
-      })
-    });
-    legendsItem.on("mouseout", function () {
-      pathCanvas.attr('display', 'block');
-      longPathCanvas.selectAll('path').remove();
-    });*/
-  })
+    })
+  }
 
   function renderInfoCanvas(data, position) {
     infoCanvas.append('rect').attrs({
