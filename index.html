@@ -19,11 +19,11 @@
 <script>
   var canvasSize = 960;
   var randPointGenY = d3.scaleLinear()
-    .domain([0.0, 0.5, 1.0])
-    .range([-15, 8, 15]);
+    .domain([0.0, 1.0])
+    .range([1, 10]);
   var randPointGenX = d3.scaleLinear()
-    .domain([0.0, 0.5, 1.0])
-    .range([-30, 15, 30]);
+    .domain([0.0, 1.0])
+    .range([1, 10]);
   var svg = d3.select("body").append("svg")
     .attr("width", canvasSize)
     .attr("height", canvasSize)
@@ -79,26 +79,37 @@
 
       }
       intIndex = parseInt(idx);
-      let fractor = ((parseInt(idx) + 1) / (productGroup.length + 1));
+      let factor = ((parseInt(idx) + 1) / (productGroup.length + 1));
       if (points.length == 2) {
-        let randomPoint = {}
+        let randomPoint = []
+        randomPoint[0] = {}
+        randomPoint[1] = {}
+
         if (points[0].y == points[1].y) {
-          randomPoint['x'] = (points[0].x + points[1].x) / 2;
-          randomPoint['y'] = (points[0].y + parseFloat(randPointGenY(fractor).toFixed(2)));
+          quarteX = (points[0].x + points[1].x) / 4;
+          randomPoint[0]['x'] = points[0].x + quarteX;
+          randomPoint[1]['x'] = points[1].x - quarteX;
+          randomPoint[0]['y'] = (points[0].y + parseFloat(randPointGenY(factor).toFixed(2)));
+          randomPoint[1]['y'] = (points[0].y - parseFloat(randPointGenY(factor).toFixed(2)));
         } else {
-          randomPoint['y'] = (points[0].y + points[1].y) / 2;
-          randomPoint['x'] = (points[0].x + parseFloat(randPointGenX(fractor).toFixed(2)));
+          quarteY = (points[0].y + points[1].y) / 4;
+          randomPoint[0]['y'] = points[0].y + quarteY;
+          randomPoint[1]['y'] = points[1].y - quarteY;
+          randomPoint[0]['x'] = (points[0].x + parseFloat(randPointGenX(factor).toFixed(2)));
+          randomPoint[1]['x'] = (points[0].x - parseFloat(randPointGenX(factor).toFixed(2)));
         }
-        points.splice(1, 0, randomPoint);
+        points.splice(1, 0, ...randomPoint);
+        //points.splice(1, 1, randomPoint);
+        console.log(points);
       }
       var curveLine = d3.line().x(function (d) {
         return d.x
       }).y(function (d) {
         return d.y
-      }).curve(d3.curveCardinal.tension(fractor.toFixed(2)));
+      }).curve(d3.curveCardinal.tension(factor.toFixed(2)));
       let path = pathCanvas.append('path').attrs({
           d: curveLine(points),
-          stroke: multiColor(fractor),
+          stroke: multiColor(factor),
           'stroke-width': 0.5,
           "fill": "none",
           class: 'move-path',
