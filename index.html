@@ -8,7 +8,10 @@
   <style>
     .info-box {
       box-shadow: 5px 10px #888888;
-      ;
+    }
+
+    .baseline {
+      stroke-dasharray: 4 4;
     }
   </style>
 </head>
@@ -18,6 +21,7 @@
 </body>
 <script>
   var canvasSize = 960;
+  var drawingPaths = [];
   var randPointGenY = d3.scaleLinear()
     .domain([0.0, 0.5, 1.0])
     .range([-15, 8, 15]);
@@ -26,16 +30,55 @@
     .range([-30, 15, 30]);
   var svg = d3.select("body").append("svg")
     .attr("width", canvasSize)
-    .attr("height", canvasSize)
-    .call(d3.zoom().on("zoom", function () {
-      svg.attr("transform", d3.event.transform)
-    }))
+    .attr("height", canvasSize);
+  //.call(draw);
+  prePathData = [
+    [12, 152],
+    [701, 152]
+  ];
+  prePathData1 = [
+    [12, 172],
+    [701, 172]
+  ];
+  prePathData2 = [
+    [133, 12],
+    [129, 309]
+  ];
+  /*[
+      [351, 11],
+      [347, 305]
+    ],
+    [
+      [561, 14],
+      [560, 309]
+    ] */
+
+  // .call(d3.zoom().on("zoom", function () {
+  //   svg.attr("transform", d3.event.transform)
+  // }))
   var nodeCanvas = svg.append('g').attr('class', 'node-canvas');
+  var pathDrawCanvas = svg.append('g').attr('class', 'path-draw-canvas');
   var pathCanvas = svg.append('g').attr('class', 'path-canvas');
   var longPathCanvas = svg.append('g').attr('class', 'long-canvas');
   var legendCanvas = svg.append('g').attr('class', 'legend-canvas');
   var infoCanvas = svg.append('g').attr('class', 'info-canvas');
 
+  pathLine = d3.line()
+    .x(function (d) {
+      return d[0];
+    })
+    .y(function (d) {
+      return d[1];
+    });
+  path1 = pathLine(prePathData);
+  path3 = pathLine(prePathData2);
+  doublePath = path1;
+  possiblePath = pathDrawCanvas.append('path').datum(prePathData)
+    .attr('d', doublePath)
+    .attrs({
+      'stroke': 'black',
+      'stroke-width': '0.5'
+    }).classed("baseline", !0);
   d3.json('node.json').then(function (rects) {
     nodeCanvas.selectAll('rect').data(rects).enter().append('rect').each(function (d, i) {
       d3.select(this).attrs({
@@ -59,6 +102,13 @@
   schemeOranges = d3.interpolateOranges;
   schemeBlue = d3.interpolateBlues;
 
+  var curveLine = d3.line().x(function (d) {
+    return d[0]
+  }).y(function (d) {
+    return d[1]
+  }).curve(d3.curveBasis);
+  //}).curve(d3.curveCardinal.tension(0));
+
   function renderPah() {
     d3.csv("data.csv").then(function (productMoves) {
       let productGroup = d3.nest()
@@ -72,58 +122,56 @@
         for (node of product.values) {
           try {
             let bBox = d3.select('#' + node.node).node().getBBox();
-            points.push({
+            let point = {
               x: (bBox.x + bBox.width / 2),
               y: (bBox.y + bBox.height / 2)
-            })
+            }
+            console.log(point);
+            points.push(point)
+
           } catch (e) {
             console.log(e);
           }
 
         }
-        intIndex = parseInt(idx);
-        let factor = ((parseInt(idx) + 1) / (productGroup.length + 1));
-        if (points.length == 2) {
-          let randomPoint = [];
-          if (points[0].y == points[1].y) {
-            randomPoint[0] = {}
-            randomPoint[0]['x'] = (points[0].x + points[1].x) / 2;
-            randomPoint[0]['y'] = (points[0].y + parseFloat(randPointGenY(factor).toFixed(2)));
-          } else if (points[0].x == points[1].x) {
-            randomPoint[0] = {}
-            randomPoint[0]['y'] = (points[0].y + points[1].y) / 2;
-            randomPoint[0]['x'] = (points[0].x + parseFloat(randPointGenX(factor).toFixed(2)));
-          } else {
-            let quartX = Math.abs((points[0].x - points[1].x) / 4);
-            let quartY = Math.abs((points[0].y - points[1].y) / 3);
-            randomPoint[0] = {}
-            randomPoint[1] = {}
-            randomPoint[0]['x'] = points[0].x
-            randomPoint[1]['x'] = points[1].x
-            if (points[0].y > points[1].y) {
-              randomPoint[0]['y'] = points[0].y - quartY - parseFloat(randPointGenY(factor).toFixed(2));
-              randomPoint[1]['y'] = points[1].y + quartY + parseFloat(randPointGenY(factor).toFixed(2));
-            } else {
-              randomPoint[0]['y'] = points[0].y + quartY + parseFloat(randPointGenY(factor).toFixed(2));
-              randomPoint[1]['y'] = points[1].y - quartY - parseFloat(randPointGenY(factor).toFixed(2));
-            }
-
-
+        let productPath = '';
+        firstPoint = null;
+        pairwise(points, function (current, next, index) {
+          if (firstPoint === null) {
+            firstPoint = current;
           }
-          points.splice(1, 0, ...randomPoint);
-          console.log(points);
-        }
-        var curveLine = d3.line().x(function (d) {
-          return d.x
-        }).y(function (d) {
-          return d.y
-        }).curve(d3.curveCardinal.tension(factor.toFixed(2)));
+          singlePathPoints = [];
+          //singlePathPoints.push(...[current, next]);
+          let x1 = closestPoint(possiblePath.node(), [current.x, current.y])
+          let x2 = closestPoint(possiblePath.node(), [next.x, next.y])
+          let midPoints = [{
+            x: x1[0],
+            y: x1[1]
+          }, {
+            x: x2[0],
+            y: x2[1]
+          }]
+          singlePathPoints = createJaggedPoints([current.x, current.y], [x1[0], x1[1]], 20, 10)
+          productPath += curveLine(singlePathPoints);
+          singlePathPoints = createJaggedPoints([x1[0], x1[1]], [x2[0], x2[1]], 20, 10)
+          productPath += curveLine(singlePathPoints);
+          singlePathPoints = createJaggedPoints([x2[0], x2[1]], [next.x, next.y], 20, 10)
+          productPath += curveLine(singlePathPoints);
+        });
+
+
+        let factor = ((parseInt(idx) + 1) / (productGroup.length + 1));
+        //console.log(points);
+
+        //console.log(productPath);
         let path = pathCanvas.append('path').attrs({
-            d: curveLine(points),
+            d: productPath,
             stroke: multiColor(factor),
-            'stroke-width': 0.5,
+            'stroke-width': .7,
             "fill": "none",
             class: 'move-path',
+          }).call(function (t) {
+            return transitionLine(t, 400)
           })
           .on('mouseover', function () {
             renderInfoCanvas({
@@ -173,7 +221,7 @@
 
     skips = skips || 1;
     for (var i = 0; i < arr.length - skips; i++) {
-      func(arr[i], arr[i + skips])
+      func(arr[i], arr[i + skips], i)
     }
   }
   var lineFunction = d3.line().x(function (d) {
@@ -181,6 +229,144 @@
   }).y(function (d) {
     return d.y;
   });
+
+  function draw(selection) {
+    var xy0,
+      path,
+      keep = false,
+      line = d3.line()
+      .x(function (d) {
+        return d[0];
+      })
+      .y(function (d) {
+        return d[1];
+      });
+    path = null;
+    selection.on('mousedown', function () {
+        keep = true;
+        xy0 = d3.mouse(this);
+        path = d3.select('svg')
+          .append('path')
+          .attr('d', line([xy0, xy0]))
+          .attrs({
+            'stroke': 'yellow',
+            'stroke-width': '1'
+          });
+      })
+      .on('mouseup', function () {
+        keep = false;
+        endXY = d3.mouse(this);
+        drawingPaths.push([xy0, [endXY[0] - 1, endXY[1] - 1]])
+        console.log(JSON.stringify(drawingPaths));
+      })
+      .on('mousemove', function () {
+        if (keep) {
+
+          Line = line([xy0, d3.mouse(this).map(function (x) {
+            return x - 1;
+          })]);
+          path.attr('d', Line);
+        }
+      });
+
+
+  }
+
+  function closestPoint(pathNode, point) {
+    var pathLength = pathNode.getTotalLength(),
+      precision = 8,
+      best,
+      bestLength,
+      bestDistance = Infinity;
+
+    // linear scan for coarse approximation
+    for (var scan, scanLength = 0, scanDistance; scanLength <= pathLength; scanLength += precision) {
+      if ((scanDistance = distance2(scan = pathNode.getPointAtLength(scanLength))) < bestDistance) {
+        best = scan, bestLength = scanLength, bestDistance = scanDistance;
+      }
+    }
+
+    // binary search for precise estimate
+    precision /= 2;
+    while (precision > 0.5) {
+      var before,
+        after,
+        beforeLength,
+        afterLength,
+        beforeDistance,
+        afterDistance;
+      if ((beforeLength = bestLength - precision) >= 0 && (beforeDistance = distance2(before = pathNode
+          .getPointAtLength(beforeLength))) < bestDistance) {
+        best = before, bestLength = beforeLength, bestDistance = beforeDistance;
+      } else if ((afterLength = bestLength + precision) <= pathLength && (afterDistance = distance2(after =
+          pathNode.getPointAtLength(afterLength))) < bestDistance) {
+        best = after, bestLength = afterLength, bestDistance = afterDistance;
+      } else {
+        precision /= 2;
+      }
+    }
+
+    best = [best.x, best.y];
+    best.distance = Math.sqrt(bestDistance);
+    return best;
+
+    function distance2(p) {
+      var dx = p.x - point[0],
+        dy = p.y - point[1];
+      return dx * dx + dy * dy;
+    }
+  }
+
+  function rotate(t, a, n) {
+    var e = t[0],
+      i = t[1],
+      r = a[0],
+      d = a[1],
+      h = e + (r - e) * Math.cos(n) - (d - i) * Math.sin(n),
+      o = i + (r - e) * Math.sin(n) + (d - i) * Math.cos(n);
+    return [h, o]
+  }
+
+  function createJaggedPoints(t, a, n, e) {
+    console.log(t, a, n, e)
+    var i = !1;
+    if (t[0] > a[0]) {
+      var r = t;
+      t = a, a = r, i = !0
+    }
+    var d = t[0],
+      h = t[1],
+      o = a[0],
+      s = a[1],
+      g = [t],
+      u = s - h,
+      c = o - d,
+      p = -Math.atan(u / c),
+      l = Math.sqrt(Math.pow(o - d, 2) + Math.pow(s - h, 2));
+    e || (e = .05 * l);
+    for (var v = rotate(t, a, p), w = v[0], m = v[1], f = d; f < w - e;) {
+      var P = Math.min(f + e + Math.random() * e, w - e),
+        M = n * (Math.random() - .5) + h;
+      g.push([P, M]), f = P
+    }
+    g.push([w, m]);
+    var k = g.map(function (n, e) {
+      return 0 === e ? t : e === g.length - 1 ? a : rotate(t, n, -p)
+    });
+    return i ? k.reverse() : k
+  }
+
+  function transitionLine(t, a) {
+    var n = t.node().getTotalLength();
+    t.attr("stroke-dasharray", "0,100000").transition().duration(n / (a / 1e3)).ease(d3.easeQuadOut).attrTween(
+      "stroke-dasharray",
+      function () {
+        var t = this.getTotalLength();
+        return d3.interpolateString("0," + t, t + "," + t)
+      }).on("end", function () {
+      d3.select(this).attr("stroke-dasharray", "none")
+    })
+  }
 </script>
 
 </html>

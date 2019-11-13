@@ -1,5 +1,7 @@
 product,production_no,node,time
-P12,PN12,node21,10:35:00
-P12,PN12,node13,10:40:00
 P13,PN12,node11,10:35:00
-P13,PN12,node24,10:40:00
+P13,PN12,node12,10:35:00
+P13,PN13,node13,10:35:00
+P14,PN12,node11,10:35:00
+P14,PN12,node12,10:35:00
+P14,PN13,node13,10:35:00
