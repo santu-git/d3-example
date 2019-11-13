@@ -106,7 +106,7 @@
     return d[0]
   }).y(function (d) {
     return d[1]
-  }).curve(d3.curveBasis);
+  }).curve(d3.curveLinear);
   //}).curve(d3.curveCardinal.tension(0));
 
   function renderPah() {
@@ -117,6 +117,7 @@
         })
         .entries(productMoves);
       for (idx in productGroup) {
+        let productIdx = parseInt(idx) + 1;
         let product = productGroup[idx];
         var points = [];
         for (node of product.values) {
@@ -124,9 +125,8 @@
             let bBox = d3.select('#' + node.node).node().getBBox();
             let point = {
               x: (bBox.x + bBox.width / 2),
-              y: (bBox.y + bBox.height / 2)
+              y: (bBox.y + bBox.height / 2),
             }
-            console.log(point);
             points.push(point)
 
           } catch (e) {
@@ -135,32 +135,55 @@
 
         }
         let productPath = '';
-        firstPoint = null;
+        singlePathPoints = [];
         pairwise(points, function (current, next, index) {
-          if (firstPoint === null) {
-            firstPoint = current;
-          }
-          singlePathPoints = [];
+          console.log(current, next, index)
+
           //singlePathPoints.push(...[current, next]);
           let x1 = closestPoint(possiblePath.node(), [current.x, current.y])
+          if (current.x == x1[0]) {
+            current.x = current.x + productIdx * 3;
+            x1[0] = x1[0] + productIdx * 3
+            x1[1] = x1[1] + productIdx * 3
+          } else {
+            current.y = current.y + productIdx * 3;
+            x1[1] = x1[1] + productIdx * 3
+            x1[0] = x1[0] + productIdx * 3
+          }
           let x2 = closestPoint(possiblePath.node(), [next.x, next.y])
-          let midPoints = [{
-            x: x1[0],
-            y: x1[1]
-          }, {
-            x: x2[0],
-            y: x2[1]
-          }]
-          singlePathPoints = createJaggedPoints([current.x, current.y], [x1[0], x1[1]], 20, 10)
+
+          if (next.x == x2[0]) {
+            next.x = next.x + productIdx * 3;
+            x2[0] = x2[0] + productIdx * 3
+            x2[1] = x2[1] + productIdx * 3
+          } else {
+            current.y = current.y + productIdx * 3;
+            x1[1] = x[1] + productIdx * 3
+            x1[0] = x[0] + productIdx * 3
+          }
+          // let midPoints = [{
+          //   x: x1[0],
+          //   y: x1[1]
+          // }, {
+          //   x: x2[0],
+          //   y: x2[1]
+          // }]
+          //if(singlePathPoints[singlePathPoints.length-1])
+          singlePathPoints.push([current.x, current.y])
+          singlePathPoints.push([x1[0], x1[1]])
+          singlePathPoints.push([x2[0], x2[1]])
+          singlePathPoints.push([next.x, next.y])
+          /*singlePathPoints = createJaggedPoints([current.x, current.y], [x1[0], x1[1]], 0, 0)
           productPath += curveLine(singlePathPoints);
-          singlePathPoints = createJaggedPoints([x1[0], x1[1]], [x2[0], x2[1]], 20, 10)
+          singlePathPoints = createJaggedPoints([x1[0], x1[1]], [x2[0], x2[1]], 0, 0)
           productPath += curveLine(singlePathPoints);
-          singlePathPoints = createJaggedPoints([x2[0], x2[1]], [next.x, next.y], 20, 10)
-          productPath += curveLine(singlePathPoints);
+          singlePathPoints = createJaggedPoints([x2[0], x2[1]], [next.x, next.y], 0, 0)*/
+          console.log(singlePathPoints);
+          productPath = curveLine(singlePathPoints);
         });
 
 
-        let factor = ((parseInt(idx) + 1) / (productGroup.length + 1));
+        let factor = ((productIdx + 1) / (productGroup.length + 1));
         //console.log(points);
 
         //console.log(productPath);
@@ -181,7 +204,7 @@
               x: d3.mouse(this)[0],
               y: d3.mouse(this)[1]
             })
-            d3.select(this).attr('stroke-width', 2)
+            d3.select(this).attr('stroke-width', 1)
           }).on('mouseout', function () {
             removeInfoCanvas();
             d3.select(this).attr('stroke-width', 0.5)
