@@ -287,8 +287,8 @@
   function renderInfoCanvas(data, position) {
     infoCanvas.append('rect').attrs({
       class: 'info-box',
-      x: position.x + 20,
-      y: position.y + 20,
+      x: position.x + 10,
+      y: position.y + 10,
       width: 140,
       height: 60,
       fill: 'white',
@@ -296,11 +296,11 @@
       'stroke': 'black',
     })
     infoCanvas.append("text").text("Product name: " + data.product).attrs({
-      x: position.x + 20,
-      y: position.y + 20
+      x: position.x + 15,
+      y: position.y + 30
     })
     infoCanvas.append("text").text("Product Line: " + data.production_no).attrs({
-      x: position.x + 20,
+      x: position.x + 15,
       y: position.y + 50
     })
   }
