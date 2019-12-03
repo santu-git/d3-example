@@ -30,7 +30,10 @@
     .range([-30, 15, 30]);
   var svg = d3.select("body").append("svg")
     .attr("width", canvasSize)
-    .attr("height", canvasSize);
+    .attr("height", canvasSize)
+    .call(d3.zoom().on("zoom", function () {
+      svg.attr("transform", d3.event.transform)
+    }));
   //.call(draw);
   prePathData = [
     [12, 152],
@@ -72,12 +75,13 @@
     });
   path1 = pathLine(prePathData);
   path3 = pathLine(prePathData2);
-  doublePath = path1;
+  doublePath = path1 + path3;
   possiblePath = pathDrawCanvas.append('path').datum(prePathData)
     .attr('d', doublePath)
     .attrs({
-      'stroke': 'black',
-      'stroke-width': '0.5'
+      'stroke': 'grey',
+      'stroke-width': '0.5',
+      opacity: 0.3
     }).classed("baseline", !0);
   d3.json('node.json').then(function (rects) {
     nodeCanvas.selectAll('rect').data(rects).enter().append('rect').each(function (d, i) {
@@ -117,16 +121,26 @@
         })
         .entries(productMoves);
       for (idx in productGroup) {
-        let productIdx = parseInt(idx) + 1;
+        let productIdx = parseInt(idx);
         let product = productGroup[idx];
         var points = [];
         for (node of product.values) {
           try {
             let bBox = d3.select('#' + node.node).node().getBBox();
+
+
             let point = {
               x: (bBox.x + bBox.width / 2),
-              y: (bBox.y + bBox.height / 2),
+              y: (bBox.y + bBox.height / 2)
             }
+            //console.log("Actual ", idx, point);
+            var lineDirection = closestPoint(possiblePath.node(), [point.x, point.y])
+            if (point.x == lineDirection[0]) {
+              point.x = point.x + (productIdx * 3);
+            } else {
+              point.y = point.y + (productIdx * 3);
+            }
+            //console.log("Shift ", idx, point);
             points.push(point)
 
           } catch (e) {
@@ -136,31 +150,42 @@
         }
         let productPath = '';
         singlePathPoints = [];
+        jaggedPoints = [];
         pairwise(points, function (current, next, index) {
-          console.log(current, next, index)
-
           //singlePathPoints.push(...[current, next]);
           let x1 = closestPoint(possiblePath.node(), [current.x, current.y])
           if (current.x == x1[0]) {
-            current.x = current.x + productIdx * 3;
-            x1[0] = x1[0] + productIdx * 3
-            x1[1] = x1[1] + productIdx * 3
+            current.x = current.x + 2;
+            x1[0] = x1[0] + 2
+            x1[1] = x1[1] + productIdx * 2
           } else {
-            current.y = current.y + productIdx * 3;
-            x1[1] = x1[1] + productIdx * 3
-            x1[0] = x1[0] + productIdx * 3
+            current.y = current.y + 2;
+            x1[1] = x1[1] + 2
+            x1[0] = x1[0] + productIdx * 2
           }
           let x2 = closestPoint(possiblePath.node(), [next.x, next.y])
-
           if (next.x == x2[0]) {
-            next.x = next.x + productIdx * 3;
-            x2[0] = x2[0] + productIdx * 3
-            x2[1] = x2[1] + productIdx * 3
+            next.x = next.x + 2;
+            x2[0] = x2[0] + 2;
+            x2[1] = x2[1] + productIdx * 2;
           } else {
-            current.y = current.y + productIdx * 3;
-            x1[1] = x[1] + productIdx * 3
-            x1[0] = x[0] + productIdx * 3
+            next.y = next.y + 2;
+            x2[1] = x2[1] + 2;
+            x2[0] = x2[0] + productIdx * 2
           }
+          midPointOfX1X2 = [];
+          midPointOfX1X2[0] = Math.round(Math.abs(x2[0] + x1[0]) / 2, 1);
+          midPointOfX1X2[1] = Math.round(Math.abs(x2[1] + x1[1]) / 2, 1);
+
+          // svg.append('circle').attrs({
+          //   cx: midPointOfX1X2[0],
+          //   cy: midPointOfX1X2[1],
+          //   r: 1,
+          //   fill: 'black',
+          //   opacity: 0.5
+          // });
+          linePoint = closestPoint(possiblePath.node(), midPointOfX1X2);
+          //console.log(midPointOfX1X2, linePoint);
           // let midPoints = [{
           //   x: x1[0],
           //   y: x1[1]
@@ -169,29 +194,68 @@
           //   y: x2[1]
           // }]
           //if(singlePathPoints[singlePathPoints.length-1])
-          singlePathPoints.push([current.x, current.y])
-          singlePathPoints.push([x1[0], x1[1]])
-          singlePathPoints.push([x2[0], x2[1]])
-          singlePathPoints.push([next.x, next.y])
-          /*singlePathPoints = createJaggedPoints([current.x, current.y], [x1[0], x1[1]], 0, 0)
-          productPath += curveLine(singlePathPoints);
-          singlePathPoints = createJaggedPoints([x1[0], x1[1]], [x2[0], x2[1]], 0, 0)
-          productPath += curveLine(singlePathPoints);
-          singlePathPoints = createJaggedPoints([x2[0], x2[1]], [next.x, next.y], 0, 0)*/
-          console.log(singlePathPoints);
-          productPath = curveLine(singlePathPoints);
+          newPoint = [];
+          singlePathPoints.push([current.x, current.y]);
+          singlePathPoints.push([x1[0], x1[1]]);
+
+          if (linePoint.distance > 0) {
+            if (linePoint[0] == midPointOfX1X2[0]) {
+              newPoint[0] = x1[0]
+              newPoint[1] = linePoint[1];
+
+            } else {
+              newPoint[1] = x1[1]
+              newPoint[0] = linePoint[0];
+            }
+            if (x1[0] == newPoint[0]) {
+              newPoint[1] = newPoint[1] + productIdx * 2
+            } else {
+              newPoint[0] = newPoint[0] + productIdx * 2
+            }
+          }
+          // svg.append('circle').attrs({
+          //   cx: newPoint[0],
+          //   cy: newPoint[1],
+          //   r: 1,
+          //   fill: 'black'
+          // })
+          // svg.append('circle').attrs({
+          //   cx: linePoint[0],
+          //   cy: linePoint[1],
+          //   r: 1,
+          //   fill: 'black'
+          // })
+          singlePathPoints.push(newPoint);
+          singlePathPoints.push([x2[0], x2[1]]);
+          singlePathPoints.push([next.x, next.y]);
+
+
+          jaggedPoints.push(...createJaggedPoints([current.x, current.y], [x1[0], x1[1]], 0, 0))
+          //productPath += curveLine(finalPoints);
+          if (newPoint.length > 0) {
+            jaggedPoints.push(...createJaggedPoints([x1[0], x1[1]], [newPoint[0], newPoint[1]], 0, 0))
+            jaggedPoints.push(...createJaggedPoints([newPoint[0], newPoint[1]], [x2[0], x2[1]], 0, 0))
+          } else {
+            jaggedPoints.push(...createJaggedPoints([x1[0], x1[1]], [x2[0], x2[1]], 0, 0))
+          }
+
+          //productPath += curveLine(finalPoints);
+          jaggedPoints.push(...createJaggedPoints([x2[0], x2[1]], [next.x, next.y], 0, 0))
+          //productPath += curveLine(finalPoints);
         });
-
-
-        let factor = ((productIdx + 1) / (productGroup.length + 1));
+        //finalPoints = []
+        //console.log(singlePathPoints);
+        productPath = curveLine(jaggedPoints);
+        let factor = ((productIdx + 2) / (productGroup.length + 2));
         //console.log(points);
 
         //console.log(productPath);
         let path = pathCanvas.append('path').attrs({
             d: productPath,
             stroke: multiColor(factor),
-            'stroke-width': .7,
+            'stroke-width': 1,
             "fill": "none",
+            opacity: 0.7,
             class: 'move-path',
           }).call(function (t) {
             return transitionLine(t, 400)
@@ -204,10 +268,16 @@
               x: d3.mouse(this)[0],
               y: d3.mouse(this)[1]
             })
-            d3.select(this).attr('stroke-width', 1)
+            d3.select(this).attrs({
+              'opacity': 1,
+              'stroke-width': 1.5
+            })
           }).on('mouseout', function () {
             removeInfoCanvas();
-            d3.select(this).attr('stroke-width', 0.5)
+            d3.select(this).attrs({
+              'opacity': 0.7,
+              'stroke-width': 1
+            })
           });
         //path.data(product.values[0]);
       }
@@ -217,8 +287,8 @@
   function renderInfoCanvas(data, position) {
     infoCanvas.append('rect').attrs({
       class: 'info-box',
-      x: position.x + 10,
-      y: position.y + 10,
+      x: position.x + 20,
+      y: position.y + 20,
       width: 140,
       height: 60,
       fill: 'white',
@@ -227,7 +297,7 @@
     })
     infoCanvas.append("text").text("Product name: " + data.product).attrs({
       x: position.x + 20,
-      y: position.y + 30
+      y: position.y + 20
     })
     infoCanvas.append("text").text("Product Line: " + data.production_no).attrs({
       x: position.x + 20,
@@ -252,6 +322,12 @@
   }).y(function (d) {
     return d.y;
   });
+
+  function scrollZoom(selection) {
+    d3.zoom().on("zoom", function () {
+      selection.attr("transform", d3.event.transform)
+    })
+  }
 
   function draw(selection) {
     var xy0,
@@ -351,7 +427,6 @@
   }
 
   function createJaggedPoints(t, a, n, e) {
-    console.log(t, a, n, e)
     var i = !1;
     if (t[0] > a[0]) {
       var r = t;
